@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Order Management</title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        h1 {
+            color: #007bff;
+            margin-bottom: 20px;
+        }
+        .accepted {
+            background-color: #d4edda;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>WebSocket Order Management</h1>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Order ID</th>
+                    <th>Order Code</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="ordersBody"></tbody>
+        </table>
+    </div>
+
+    <script>
+        const socket = new WebSocket('ws://localhost:8000/ws/orders/');
+        let orders = {};
+
+        socket.onopen = function() {
+            console.log('WebSocket connection established');
+        };
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            console.log('Data received:', data);
+
+            if (data.type === 'initial_orders') {
+                displayOrders(data.orders);
+            } else if (data.type === 'order_accepted') {
+                acceptOrderInUI(data.order);
+            } else if (data.type === 'order_created') {
+                addOrderToUI(data.order);
+            }
+        };
+
+        socket.onclose = function(event) {
+            console.log('WebSocket connection closed:', event);
+        };
+
+        function displayOrders(ordersList) {
+            const ordersTable = document.getElementById('ordersBody');
+            ordersTable.innerHTML = '';
+
+            ordersList.forEach(order => {
+                orders[order.pk] = order;
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${order.pk}</td>
+                    <td>${order.code}</td>
+                    <td>${order.status}</td>
+                    <td>
+                        <button class="btn btn-primary" onclick="acceptOrder(${order.pk})">Accept Order</button>
+                    </td>
+                `;
+                ordersTable.appendChild(row);
+            });
+        }
+
+        function acceptOrder(orderId) {
+            const message = {
+                type: 'accept_order',
+                orderId: orderId
+            };
+            socket.send(JSON.stringify(message));
+            console.log(`Sent accept order request: ${orderId}`);
+        }
+
+        function acceptOrderInUI(order) {
+            const row = Array.from(document.querySelectorAll('#ordersBody tr')).find(tr => {
+                return tr.cells[0].innerText === order.pk.toString();
+            });
+            if (row) {
+                row.classList.add('accepted');
+                const statusCell = row.cells[2];
+                statusCell.innerText = order.status;
+                console.log(`Order accepted: ${order.pk}`);
+            }
+        }
+
+        function addOrderToUI(order) {
+            const ordersTable = document.getElementById('ordersBody');
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${order.pk}</td>
+                <td>${order.code}</td>
+                <td>${order.status}</td>
+                <td>
+                    <button class="btn btn-primary" onclick="acceptOrder(${order.pk})">Accept Order</button>
+                </td>
+            `;
+            ordersTable.appendChild(row);
+            console.log(`New order added: ${order.pk}`);
+        }
+    </script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
