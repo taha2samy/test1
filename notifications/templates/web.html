@@ -14,7 +14,12 @@
             margin-bottom: 20px;
         }
         .accepted {
-            background-color: #d4edda;
+            background-color: #d4edda; /* Light green color */
+            transition: background-color 0.5s ease; /* Transition effect */
+        }
+        .fade-out {
+            opacity: 0;
+            transition: opacity 1s ease; /* Fade out effect */
         }
     </style>
 </head>
@@ -45,13 +50,13 @@
         socket.onmessage = function(event) {
             const data = JSON.parse(event.data);
             console.log('Data received:', data);
-
+            console.log(data.type,"---------")
             if (data.type === 'initial_orders') {
                 displayOrders(data.orders);
-            } else if (data.type === 'order_accepted') {
-                acceptOrderInUI(data.order);
-            } else if (data.type === 'order_created') {
+            } else if (data.type === 'order_created' || data.type === 'order_pending') {
                 addOrderToUI(data.order);
+            } else if (data.type === 'order_active' || data.type === 'order_deleted') {
+                removeOrderFromUI(data.order);
             }
         };
 
@@ -65,53 +70,73 @@
 
             ordersList.forEach(order => {
                 orders[order.pk] = order;
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${order.pk}</td>
-                    <td>${order.code}</td>
-                    <td>${order.status}</td>
-                    <td>
-                        <button class="btn btn-primary" onclick="acceptOrder(${order.pk})">Accept Order</button>
-                    </td>
-                `;
-                ordersTable.appendChild(row);
+                if (order.status === 'pending') {
+                    addOrderToUI(order);
+                }
             });
-        }
-
-        function acceptOrder(orderId) {
-            const message = {
-                type: 'accept_order',
-                orderId: orderId
-            };
-            socket.send(JSON.stringify(message));
-            console.log(`Sent accept order request: ${orderId}`);
-        }
-
-        function acceptOrderInUI(order) {
-            const row = Array.from(document.querySelectorAll('#ordersBody tr')).find(tr => {
-                return tr.cells[0].innerText === order.pk.toString();
-            });
-            if (row) {
-                row.classList.add('accepted');
-                const statusCell = row.cells[2];
-                statusCell.innerText = order.status;
-                console.log(`Order accepted: ${order.pk}`);
-            }
         }
 
         function addOrderToUI(order) {
-            const ordersTable = document.getElementById('ordersBody');
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${order.pk}</td>
-                <td>${order.code}</td>
-                <td>${order.status}</td>
-                <td>
-                    <button class="btn btn-primary" onclick="acceptOrder(${order.pk})">Accept Order</button>
-                </td>
-            `;
-            ordersTable.appendChild(row);
-            console.log(`New order added: ${order.pk}`);
+    const ordersTable = document.getElementById('ordersBody');
+    const existingRow = document.querySelector(`#order-${order.pk}`);
+    if (!existingRow) {
+        const row = document.createElement('tr');
+        row.id = `order-${order.pk}`;
+        row.innerHTML = `
+            <td>${order.pk}</td>
+            <td>${order.code}</td>
+            <td>${order.status}</td>
+            <td>
+                <button class="btn btn-primary" onclick="acceptOrder(${order.pk})">Accept Order</button>
+            </td>
+        `;
+        ordersTable.appendChild(row);
+        console.log(`Order added/updated in UI: ${order.pk}`);
+
+        // Change the row's background color to green
+        row.classList.add('accepted');
+
+        // Gradually change the background color to white after a brief delay
+        setTimeout(() => {
+            row.classList.remove('accepted'); // Remove the green color
+            row.classList.add('fade-to-white'); // Add class for fading to white
+        }, 1000); // Delay for 1 second before changing to white
+    }
+}
+
+
+        function acceptOrder(orderId) {
+            const row = document.getElementById(`order-${orderId}`);
+            if (row) {
+                // Change the row's background color to green
+                row.classList.add('accepted');
+                // Send the accept order message
+                const message = {
+                    type: 'accept_order',
+                    orderId: orderId
+                };
+                socket.send(JSON.stringify(message));
+                console.log(`Sent accept order request: ${orderId}`);
+
+                // Remove the row after a delay
+                setTimeout(() => {
+                    removeOrderFromUI({ pk: orderId });
+                }, 1500); // Delay for 1.5 seconds before removing
+            }
+        }
+
+        function removeOrderFromUI(order) {
+            const row = document.getElementById(`order-${order.pk}`);
+            if (row) {
+                // Add fade-out class
+                row.classList.add('fade-out');
+
+                // Remove the row after the fade-out transition
+                row.addEventListener('transitionend', () => {
+                    row.remove();
+                    console.log(`Order removed from UI: ${order.pk}`);
+                });
+            }
         }
     </script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>

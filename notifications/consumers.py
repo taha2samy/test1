@@ -67,6 +67,22 @@ class OrderConsumer(AsyncWebsocketConsumer):
             'type': 'order_created',
             'order': event['order'],
         }))
+    async def order_deleted(self, event):
+        print("ordre deleted")
+        print(f"Sending order created event: {event['order']['pk']}")
+        event['order']['remove']=True
+        await self.send(text_data=json.dumps({
+            'type': 'order_deleted',
+            'order': event['order'],
+        }))
+    async def order_active(self, event):
+        print("ordre active")
+        print(f"Sending order created event: {event['order']['pk']}")
+        event['order']['active']=True
+        await self.send(text_data=json.dumps({
+            'type': 'order_active',
+            'order': event['order'],
+        }))
 
     def get_pending_orders(self):
         return list(Order.objects.filter(status='pending'))
